@@ -16,7 +16,7 @@ global.isBaileysFail = false
 global.defaultLenguaje = 'es';
 
 global.owner = [
-  ['201151094460', '👑 ERIN-MD 👑', true],
+  ['201151094460', '👑 ERIN-MD  👑', true],
 ];
 
 global.suittag = ['201151094460'];
