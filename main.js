@@ -1,4 +1,3 @@
-"use strict";
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1'; 
 import './config.js';
 import './api.js';
@@ -19,7 +18,10 @@ import {Boom} from '@hapi/boom';
 import {makeWASocket, protoType, serialize} from './src/libraries/simple.js';
 import {Low, JSONFile} from 'lowdb';
 import store from './src/libraries/store.js';
-const {DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, jidNormalizedUser, PHONENUMBER_MCC} = await import("baileys");
+import pkg from 'google-libphonenumber';
+const { PhoneNumberUtil } = pkg;
+const phoneUtil = PhoneNumberUtil.getInstance();
+const {DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, jidNormalizedUser } = await import("baileys");
 import readline from 'readline';
 import NodeCache from 'node-cache';
 const {chain} = lodash;
@@ -44,7 +46,7 @@ global.videoList = [];
 global.videoListXXX = [];
 const __dirname = global.__dirname(import.meta.url);
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse());
-global.prefix = new RegExp('^[' + (opts['prefix'] || '*/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.\\-.@').replace(/[|\\{}()[\]^$+*?.\-\^]/g, '\\$&') + ']');
+global.prefix = new RegExp('^[#!/.]')
 global.db = new Low(/https?:\/\//.test(opts['db'] || '') ? new cloudDBAdapter(opts['db']) : new JSONFile(`${opts._[0] ? opts._[0] + '_' : ''}database.json`));
 
 
@@ -104,7 +106,7 @@ loadChatgptDB();
 
 const {state, saveCreds} = await useMultiFileAuthState(global.authFile);
 
-const {version} = await fetchLatestBaileysVersion();
+const { version } = await fetchLatestBaileysVersion();
 let phoneNumber = global.botnumber || process.argv.find(arg => /^\+\d+$/.test(arg));
 
 const methodCodeQR = process.argv.includes("qr")
@@ -126,78 +128,74 @@ do {
   }} while (opcion !== '1' && opcion !== '2' || fs.existsSync(`./${authFile}/creds.json`))
   }
 
-console.info = () => {} // https://github.com/skidy89/baileys actualmente no muestra logs molestos en la consola
+const filterStrings = [
+"Q2xvc2luZyBzdGFsZSBvcGVu", // "Closing stable open"
+"Q2xvc2luZyBvcGVuIHNlc3Npb24=", // "Closing open session"
+"RmFpbGVkIHRvIGRlY3J5cHQ=", // "Failed to decrypt"
+"U2Vzc2lvbiBlcnJvcg==", // "Session error"
+"RXJyb3I6IEJhZCBNQUM=", // "Error: Bad MAC" 
+"RGVjcnlwdGVkIG1lc3NhZ2U=" // "Decrypted message" 
+]
+
+    console.info = () => { }
+    console.debug = () => { }
+    ['log', 'warn', 'error'].forEach(methodName => redefineConsoleMethod(methodName, filterStrings))
+
 const connectionOptions = {
-    logger: Pino({ level: 'silent' }),
-    printQRInTerminal: opcion === '1' || methodCodeQR,
-    mobile: MethodMobile,
-    browser: opcion === '1' ? ['Nano-Bot-V2', 'Safari', '2.0.0'] : methodCodeQR ? ['Nano-Bot-V2', 'Safari', '2.0.0'] : ['Ubuntu', 'Chrome', '20.0.04'],
-    auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, Pino({ level: 'fatal' }).child({ level: 'fatal' })),
-    },
-    waWebSocketUrl: 'wss://web.whatsapp.com/ws/chat?ED=CAIICA',
-    markOnlineOnConnect: true,
-    generateHighQualityLinkPreview: true,
-    getMessage: async (key) => {
-        let jid = jidNormalizedUser(key.remoteJid);
-        let msg = await store.loadMessage(jid, key.id);
-        return msg?.message || "";
-    },
-    patchMessageBeforeSending: async (message) => {
-        let messages = 0;
-        global.conn.uploadPreKeysToServerIfRequired();
-        messages++;
-        return message;
-    },
-    msgRetryCounterCache: msgRetryCounterCache,
-    userDevicesCache: userDevicesCache,
-    //msgRetryCounterMap,
-    defaultQueryTimeoutMs: undefined,
-    cachedGroupMetadata: (jid) => global.conn.chats[jid] ?? {},
-    version: [2, 3000, 1015901307],
-    //userDeviceCache: msgRetryCounterCache <=== quien fue el pendejo?????
+logger: pino({ level: 'silent' }),
+printQRInTerminal: opcion == '1' ? true : methodCodeQR ? true : false,
+mobile: MethodMobile, 
+browser: opcion === '1' ? ['Nano-Bot-V2', 'Safari', '2.0.0'] : methodCodeQR ? ['Nano-Bot-V2', 'Safari', '2.0.0'] : ['Ubuntu', 'Chrome', '20.0.04'],
+auth: {
+creds: state.creds,
+keys: makeCacheableSignalKeyStore(state.keys, Pino({ level: "fatal" }).child({ level: "fatal" })),
+},
+markOnlineOnConnect: false, 
+generateHighQualityLinkPreview: true, 
+syncFullHistory: false,
+getMessage: async (key) => {
+try {
+let jid = jidNormalizedUser(key.remoteJid);
+let msg = await store.loadMessage(jid, key.id);
+return msg?.message || "";
+} catch (error) {
+return "";
+}},
+msgRetryCounterCache: msgRetryCounterCache || new Map(),
+userDevicesCache: userDevicesCache || new Map(),
+//msgRetryCounterMap,
+defaultQueryTimeoutMs: undefined,
+cachedGroupMetadata: (jid) => global.conn.chats[jid] ?? {},
+version: version, 
+keepAliveIntervalMs: 55000, 
+maxIdleTimeMs: 60000, 
 };
 
 global.conn = makeWASocket(connectionOptions);
 
-if (!fs.existsSync(`./${authFile}/creds.json`)) {
+if (!fs.existsSync(`./MysticSession/creds.json`)) {
 if (opcion === '2' || methodCode) {
 opcion = '2'
-if (!conn.authState.creds.registered) {  
-if (MethodMobile) throw new Error('لا يمكن استخدام رمز الاقتران مع واجهة برمجة التطبيقات المحمولة.')
-
-let numeroTelefono
+if (!conn.authState.creds.registered) {
+let addNumber
 if (!!phoneNumber) {
-numeroTelefono = phoneNumber.replace(/[^0-9]/g, '')
-if (!Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
-
-console.log(chalk.bgBlack(chalk.bold.redBright("ابدأ برمز الدولة لرقم WhatsApp الخاص بك.\nمثال: +201151094460\n")));
-
-process.exit(0)
-}} else {
-while (true) {
-numeroTelefono = await question(chalk.bgBlack(chalk.bold.yellowBright('يرجى كتابة رقم WhatsApp الخاص بك.\nمثال: +201151094460\n')));
-
-numeroTelefono = numeroTelefono.replace(/[^0-9]/g, '')
-
-if (numeroTelefono.match(/^\d+$/) && Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
-break 
+addNumber = phoneNumber.replace(/[^0-9]/g, '')
 } else {
-console.log(chalk.bgBlack(chalk.bold.redBright("يرجى كتابة رقم WhatsApp الخاص بك.\nمثال: +201151094460.\n")));
-
-}}
-rl.close()  
-} 
-
-        setTimeout(async () => {
-            let codigo = await conn.requestPairingCode(numeroTelefono)
-            codigo = codigo?.match(/.{1,4}/g)?.join("-") || codigo
-            console.log(chalk.yellow('[ ℹ️ ] أدخل رمز الاقتران في WhatsApp.'))
-console.log(chalk.black(chalk.bgGreen(`رمز الاقتران الخاص بك: `)), chalk.black(chalk.white(codigo)))
-
-        }, 3000)
-}}
+do {
+phoneNumber = await question(chalk.bgBlack(chalk.bold.greenBright(`[ ❗ ] مثال للرقم.\n${chalk.bold.yellowBright(`Ejemplo: 5289×××××××`)}\n${chalk.bold.magentaBright('---> ')}`)))
+phoneNumber = phoneNumber.replace(/\D/g,'')
+if (!phoneNumber.startsWith('+')) {
+phoneNumber = `+${phoneNumber}`
+}
+} while (!await رقم هاتف صالح(phoneNumber))
+rl.close()
+addNumber = phoneNumber.replace(/\D/g, '')
+setTimeout(async () => {
+let codeBot = await conn.requestPairingCode(addNumber)
+codeBot = codeBot?.match(/.{1,4}/g)?.join("-") || codeBot
+console.log(chalk.bold.white(chalk.bgMagenta(`[ ℹ️ ] كود الربط: `)), chalk.bold.white(chalk.white(codeBot)))
+}, 3000)
+}}}
 }
 
 conn.isInit = false;
@@ -225,12 +223,12 @@ if (opts['server']) (await import('./server.js')).default(global.conn, PORT);
         que me arrepiento de ser un grasoso
         Por que la grasa es un sentimiento
         - El waza 👻👻👻👻 (Aiden)            
-
+        
    Yo tambien se hacer momazos Aiden...
         ahi te va el ajuste de los borrados
         inteligentes de las sesiones y de los sub-bot
         By (Rey Endymion 👺👍🏼) 
-
+        
    Ninguno es mejor que tilin god
         - atte: sk1d             */
 
@@ -253,9 +251,9 @@ function deleteCoreFiles(filePath) {
   if (coreFilePattern.test(filename)) {
     fs.unlink(filePath, (err) => {
       if (err) {
-        console.error(`خطأ في حذف الملف ${filePath}:`, err);
+        console.error(`Error eliminando el archivo ${filePath}:`, err);
       } else {
-        console.log(`تم حذف الملف: ${filePath}`);
+        console.log(`Archivo eliminado: ${filePath}`);
       }
     });
   }
@@ -279,7 +277,7 @@ return file.startsWith('pre-key-') /*|| file.startsWith('session-') || file.star
 })
 prekey = [...prekey, ...filesFolderPreKeys]
 filesFolderPreKeys.forEach(files => {
-unlinkSync(`./NanoSession/${files}`)
+unlinkSync(`./MysticSession/${files}`)
 })
 } 
 
@@ -300,7 +298,7 @@ unlinkSync(`./jadibts/${directorio}/${fileInDir}`)
 })
 if (SBprekey.length === 0) return; //console.log(chalk.cyanBright(`=> No hay archivos por eliminar.`))
 } catch (err) {
-console.log(chalk.bold.red(`[ ℹ️ ] حدث خطأ أثناء الحذف، الملفات لم تُحذف`))
+console.log(chalk.bold.red(`[ ℹ️ ] حدث خطأ ما أثناء الحذف، لم يتم حذف الملفات`))
 }}
 
 function purgeOldFiles() {
@@ -324,7 +322,7 @@ console.log(chalk.bold.red(`لم يتم حذف الملف ${file}` + err))
 }
 
 async function connectionUpdate(update) {
-
+  
 
   const {connection, lastDisconnect, isNewLogin} = update;
   stopped = connection;
@@ -336,44 +334,44 @@ async function connectionUpdate(update) {
   }
   if (global.db.data == null) loadDatabase();
 if (update.qr != 0 && update.qr != undefined || methodCodeQR) {
-  if (opcion == '1' || methodCodeQR) {
-    console.log(chalk.yellow('[ ℹ️ ] قم بمسح رمز الاستجابة السريعة (QR).'));
-  }}
+if (opcion == '1' || methodCodeQR) {
+    console.log(chalk.yellow('[ ℹ️ ] امسح رمز QR ضوئيًا.'));
+ }}
   if (connection == 'open') {
     console.log(chalk.yellow('[ ℹ️ ] تم الاتصال بنجاح.'));
   }
-  let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-  if (reason == 405) {
-  await fs.unlinkSync("./MysticSession/" + "creds.json")
-  console.log(chalk.bold.redBright(`[ ⚠ ] تم استبدال الاتصال، يرجى الانتظار لحظة سأقوم بإعادة التشغيل...\nإذا ظهرت أخطاء، يرجى البدء مرة أخرى باستخدام: npm start`))
-  process.send('reset')}
-  if (connection === 'close') {
-      if (reason === DisconnectReason.badSession) {
-          conn.logger.error(`[ ⚠ ] جلسة غير صحيحة، يرجى حذف المجلد ${global.authFile} وإعادة المسح مرة أخرى.`);
-          //process.exit();
-      } else if (reason === DisconnectReason.connectionClosed) {
-      conn.logger.warn(`[ ⚠ ] الاتصال مغلق، جاري إعادة الاتصال...`);
-      await global.reloadHandler(true).catch(console.error);
-  } else if (reason === DisconnectReason.connectionLost) {
-      conn.logger.warn(`[ ⚠ ] فقدان الاتصال بالخادم، جاري إعادة الاتصال...`);
-      await global.reloadHandler(true).catch(console.error);
-  } else if (reason === DisconnectReason.connectionReplaced) {
-      conn.logger.error(`[ ⚠ ] الاتصال تم استبداله، تم فتح جلسة جديدة. يرجى إغلاق الجلسة الحالية أولاً.`);
-      //process.exit();
-  } else if (reason === DisconnectReason.loggedOut) {
-      conn.logger.error(`[ ⚠ ] الاتصال مغلق، يرجى حذف المجلد ${global.authFile} وإعادة المسح مرة أخرى.`);
-      //process.exit();
-  } else if (reason === DisconnectReason.restartRequired) {
-      conn.logger.info(`[ ⚠ ] إعادة التشغيل مطلوبة، يرجى إعادة تشغيل الخادم إذا واجهت أي مشاكل.`);
-      await global.reloadHandler(true).catch(console.error);
-  } else if (reason === DisconnectReason.timedOut) {
-      conn.logger.warn(`[ ⚠ ] انقضى وقت الاتصال، جاري إعادة الاتصال...`);
-      await global.reloadHandler(true).catch(console.error);
-} else {
-      conn.logger.warn(`[ ⚠ ] سبب الانفصال غير معروف. ${reason || ''}: ${connection || ''}`);
-      await global.reloadHandler(true).catch(console.error);
-}
-    
+let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+if (reason == 405) {
+await fs.unlinkSync("./MysticSession/" + "creds.json")
+console.log(chalk.bold.redBright(`[ ⚠ ] تم استبدال الاتصال، يرجى الانتظار لحظة، سأعيد التشغيل...  
+إذا ظهرت أخطاء، يُرجى البدء مرة أخرى باستخدام: npm start`)) 
+process.send('reset')}
+if (connection === 'close') {
+    if (reason === DisconnectReason.badSession) {
+        conn.logger.error(`[ ⚠ ] جلسة غير صحيحة، يرجى حذف المجلد ${global.authFile} والمسح مرة أخرى.`);
+        //process.exit();
+    } else if (reason === DisconnectReason.connectionClosed) {
+        conn.logger.warn(`[ ⚠ ] تم إغلاق الاتصال، جارٍ إعادة الاتصال......`);
+        await global.reloadHandler(true).catch(console.error);
+    } else if (reason === DisconnectReason.connectionLost) {
+        conn.logger.warn(`[ ⚠ ] فُقد الاتصال بالخادم، جارٍ إعادة الاتصال...`);
+        await global.reloadHandler(true).catch(console.error);
+    } else if (reason === DisconnectReason.connectionReplaced) {
+        conn.logger.error(`[ ⚠ ] تم استبدال الاتصال، هناك جلسة جديدة مفتوحة. يرجى إنهاء الجلسة الحالية أولاً.`);
+        //process.exit();
+    } else if (reason === DisconnectReason.loggedOut) {
+        conn.logger.error(`[ ⚠ ] تم إغلاق الاتصال، يرجى حذف المجلد ${global.authFile} والمسح ضوئيًا مرة أخرى.`);
+        //process.exit();
+    } else if (reason === DisconnectReason.restartRequired) {
+        conn.logger.info(`[ ⚠ ] إعادة تشغيل مطلوبة، يرجى إعادة تشغيل السيرفر في حال واجهت أي مشكلة.`);
+        await global.reloadHandler(true).catch(console.error);
+    } else if (reason === DisconnectReason.timedOut) {
+        conn.logger.warn(`[ ⚠ ] انتهى وقت الاتصال، جاري إعادة الاتصال......`);
+        await global.reloadHandler(true).catch(console.error);
+    } else {
+        conn.logger.warn(`[ ⚠ ] سبب قطع الاتصال غير معروف. ${reason || ''}: ${connection || ''}`);
+        await global.reloadHandler(true).catch(console.error);
+    }
 }
 }
 
@@ -383,9 +381,9 @@ let isInit = true;
 
 let handler = await import('./handler.js');
 global.reloadHandler = async function(restatConn) {
-
+  
   try {
-
+   
     const Handler = await import(`./handler.js?update=${Date.now()}`).catch(console.error);
     if (Object.keys(Handler || {}).length) handler = Handler;
   } catch (e) {
@@ -471,23 +469,23 @@ global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
     const dir = global.__filename(join(pluginFolder, filename), true);
     if (filename in global.plugins) {
-      if (existsSync(dir)) conn.logger.info(` updated plugin - '${filename}'`);
+      if (existsSync(dir)) conn.logger.info(` تم اضافة كود جديد - '${filename}'`);
       else {
-        conn.logger.warn(`deleted plugin - '${filename}'`);
+        conn.logger.warn(`تم حذف كود - '${filename}'`);
         return delete global.plugins[filename];
       }
-    } else conn.logger.info(`new plugin - '${filename}'`);
+    } else conn.logger.info(`كود جديد - '${filename}'`);
     const err = syntaxerror(readFileSync(dir), filename, {
       sourceType: 'module',
       allowAwaitOutsideFunction: true,
     });
-    if (err) conn.logger.error(`syntax error while loading '${filename}'\n${format(err)}`);
+    if (err) conn.logger.error(`خطأ في الصياغة أثناء التحميل '${filename}'\n${format(err)}`);
     else {
       try {
         const module = (await import(`${global.__filename(dir)}?update=${Date.now()}`));
         global.plugins[filename] = module.default || module;
       } catch (e) {
-        conn.logger.error(`error require plugin '${filename}\n${format(e)}'`);
+        conn.logger.error(`خطأ: مطلوب إضافة Plugin '${filename}\n${format(e)}'`);
       } finally {
         global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)));
       }
@@ -521,6 +519,15 @@ async function _quickTest() {
   global.support = {ffmpeg, ffprobe, ffmpegWebp, convert, magick, gm, find};
   Object.freeze(global.support);
 }
+function redefineConsoleMethod(methodName, filterStrings) {
+const originalConsoleMethod = console[methodName]
+console[methodName] = function() {
+const message = arguments[0]
+if (typeof message === 'string' && filterStrings.some(filterString => message.includes(atob(filterString)))) {
+arguments[0] = ""
+}
+originalConsoleMethod.apply(console, arguments)
+}}
 setInterval(async () => {
   if (stopped === 'close' || !conn || !conn?.user) return;
   await clearTmp();
@@ -548,3 +555,17 @@ function clockString(ms) {
   return [d, 'd ️', h, 'h ', m, 'm ', s, 's '].map((v) => v.toString().padStart(2, 0)).join('');
 }
 _quickTest().catch(console.error);
+
+async function isValidPhoneNumber(number) {
+try {
+number = number.replace(/\s+/g, '')
+if (number.startsWith('+521')) {
+number = number.replace('+521', '+52');
+} else if (number.startsWith('+52') && number[4] === '1') {
+number = number.replace('+52 1', '+52');
+}
+const parsedNumber = phoneUtil.parseAndKeepRawInput(number)
+return phoneUtil.isValidNumber(parsedNumber)
+} catch (error) {
+return false
+}}
