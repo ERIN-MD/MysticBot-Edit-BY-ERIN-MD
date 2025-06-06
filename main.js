@@ -173,7 +173,7 @@ maxIdleTimeMs: 60000,
 
 global.conn = makeWASocket(connectionOptions);
 
-if (!fs.existsSync(`./MysticSession/creds.json`)) {
+if (!fs.existsSync(`./${authFile}/creds.json`)) {
 if (opcion === '2' || methodCode) {
 opcion = '2'
 if (!conn.authState.creds.registered) {
@@ -251,9 +251,9 @@ function deleteCoreFiles(filePath) {
   if (coreFilePattern.test(filename)) {
     fs.unlink(filePath, (err) => {
       if (err) {
-        console.error(`Error eliminando el archivo ${filePath}:`, err);
+        console.error(`خطأ أثناء حذف الملف ${filePath}:`, err);
       } else {
-        console.log(`Archivo eliminado: ${filePath}`);
+        console.log(`تم حذف الملف: ${filePath}`);
       }
     });
   }
@@ -271,7 +271,7 @@ fs.watch(dirToWatchccc, (eventType, filename) => {
 
 function purgeSession() {
 let prekey = []
-let directorio = readdirSync("./MysticSession")
+let directorio = readdirSync("./${authFile}")
 let filesFolderPreKeys = directorio.filter(file => {
 return file.startsWith('pre-key-') /*|| file.startsWith('session-') || file.startsWith('sender-') || file.startsWith('app-') */
 })
@@ -302,7 +302,7 @@ console.log(chalk.bold.red(`[ ℹ️ ] حدث خطأ ما أثناء الحذف�
 }}
 
 function purgeOldFiles() {
-const directories = ['./MysticSession/', './jadibts/']
+const directories = ['./${authFile}/', './jadibts/']
 const oneHourAgo = Date.now() - (60 * 60 * 1000)
 directories.forEach(dir => {
 readdirSync(dir, (err, files) => {
@@ -342,7 +342,7 @@ if (opcion == '1' || methodCodeQR) {
   }
 let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
 if (reason == 405) {
-await fs.unlinkSync("./MysticSession/" + "creds.json")
+await fs.unlinkSync("./${authFile}/" + "creds.json")
 console.log(chalk.bold.redBright(`[ ⚠ ] تم استبدال الاتصال، يرجى الانتظار لحظة، سأعيد التشغيل...  
 إذا ظهرت أخطاء، يُرجى البدء مرة أخرى باستخدام: npm start`)) 
 process.send('reset')}
