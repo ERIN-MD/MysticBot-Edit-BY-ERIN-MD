@@ -84,7 +84,7 @@
 
     "@vitalets/google-translate-api": "^8.0.0",
 
-    "baileys": "github:ArabsDev/Baileys",
+    "baileys": "github:CentreTheEnd/Baileys",
 
     "acrcloud": "^1.4.0",
 
@@ -137,6 +137,8 @@
     "google-play-scraper": "^10.0.0",
 
     "hispamemes": "^1.0.7",
+
+    "p-queue": "^7.3.0",
 
     "human-readable": "^0.2.1",
 
@@ -213,6 +215,10 @@
     "yargs": "^17.3.1",
 
     "yt-search": "^2.10.3",
+
+    "@seald-io/nedb": "^2.1.1",
+
+    "google-libphonenumber": "^3.2.31",
 
     "ytdl-core": "github:khlevon/node-ytdl-core#v4.11.4-patch.2"
 
